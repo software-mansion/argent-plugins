@@ -1,20 +1,38 @@
 #!/usr/bin/env node
-// SessionStart hook of the Argent plugin for Claude Code, wired up in hooks.json.
+// SessionStart hook of the Argent plugin, wired up in hooks.json for Claude Code
+// and in codex.json for Codex, which passes `codex` as the first argument.
 //
 // Installing the plugin doesn't install Argent. The plugin starts its MCP server
 // as `argent mcp` and the skills run `argent` commands, so both need the CLI on
-// PATH, and Claude Code starts the server without checking: when the command is
-// missing, the server only shows as failed in /mcp. This hook catches that case
-// and tells Claude, which offers the install to the user. It prints nothing when
+// PATH, and the agent starts the server without checking: when the command is
+// missing, the server only shows as failed. This hook catches that case and
+// tells the agent, which offers the install to the user. It prints nothing when
 // `argent` is on PATH, so a working setup costs no context.
 //
-// Claude Code adds a SessionStart hook's plain stdout to Claude's context. The
-// hook runs as `node <this file>` rather than through a shell, so it behaves the
-// same on Windows without Git Bash, and `process.version` is the Node.js that a
-// global `argent` would run on.
+// Claude Code and Codex both add a SessionStart hook's plain stdout to the
+// agent's context. Claude Code runs this file as `node <this file>` rather than
+// through a shell, so it behaves the same on Windows without Git Bash. Codex
+// always runs hooks through a shell and ignores `args`, so codex.json gives the
+// whole command as one string. Either way `process.version` is the Node.js that
+// a global `argent` would run on.
 
 import { accessSync, constants, statSync } from "node:fs";
 import { delimiter, join } from "node:path";
+
+// What differs between the tools that run this hook. Claude Code passes no argument.
+const AGENTS = {
+  "claude-code": {
+    name: "Claude Code",
+    server: "plugin:argent:argent",
+    afterInstall: "select Reconnect for plugin:argent:argent in /mcp, or restart Claude Code,",
+  },
+  "codex": {
+    name: "Codex",
+    server: "argent",
+    afterInstall: "restart Codex",
+  },
+};
+const agent = AGENTS[process.argv[2] ?? "claude-code"] ?? AGENTS["claude-code"];
 
 /**
  * Whether `name` resolves to a runnable file on PATH, the way a shell would find
@@ -43,17 +61,18 @@ function isOnPath(name) {
 }
 
 if (!isOnPath("argent")) {
-  // The Node.js range is `engines.node` in packages/argent/package.json of the
-  // argent repository.
+  // npm only warns when Node.js is outside Argent's `engines` range, and installs
+  // anyway, so Claude checks the range before installing. It reads the range
+  // from npm because a copy here would go stale.
   console.log(
     [
-      "The Argent plugin for Claude Code is enabled, but the `argent` command is not on PATH. The plugin's Argent MCP server (plugin:argent:argent) could not start, and the `argent` commands in the Argent skills will fail.",
+      `The Argent plugin for ${agent.name} is enabled, but the \`argent\` command is not on PATH. The plugin's Argent MCP server (${agent.server}) could not start, and the \`argent\` commands in the Argent skills will fail.`,
       "",
       "If the user asks for something that needs Argent, such as driving an iOS simulator, Android emulator, device, TV, Mac app or Electron app, running e2e tests, comparing screenshots or profiling, tell them Argent isn't installed and offer to install it with `npm install -g @swmansion/argent`. Run the install only after they agree. Otherwise, don't bring it up.",
       "",
-      `Argent needs Node.js 22.18 or later, but not 23.0 to 23.7. The Node.js on PATH is ${process.version}. After the install, the user has to select Reconnect for plugin:argent:argent in /mcp, or restart Claude Code, before Argent's tools appear.`,
+      `The Node.js on PATH is ${process.version}. Before installing, compare it with the Node.js versions Argent supports, from \`npm view @swmansion/argent engines.node\`, and if it's outside that range, ask the user to switch Node.js first. After the install, the user has to ${agent.afterInstall} before Argent's tools appear.`,
       "",
-      "Don't suggest `argent init` for Claude Code: this plugin already provides Argent's MCP server and skills.",
+      `Don't suggest \`argent init\` for ${agent.name}: this plugin already provides Argent's MCP server and skills.`,
     ].join("\n")
   );
 }

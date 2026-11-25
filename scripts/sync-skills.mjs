@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Makes the plugin match one Argent release: replaces plugins/argent/skills with the
 // skills from a checkout of the argent repository at tag v<version>, and sets
-// the plugin's version to <version>. The sync workflow runs it for each new
+// the version to <version> in each tool's manifest (.claude-plugin/plugin.json,
+// .codex-plugin/plugin.json, and so on). The sync workflow runs it for each new
 // stable release.
 //
 // With --check it changes nothing and fails when the plugin differs from that
@@ -121,21 +122,32 @@ if (!existsSync(sourceSkills) || !listFiles(sourceSkills).some((f) => f.endsWith
   fail(`${sourceSkills} has no skills.`);
 }
 
-const manifestPath = join(plugin, ".claude-plugin", "plugin.json");
-let manifestText;
+// Each tool reads its own manifest from a `.<tool>-plugin` folder, and all of
+// them carry the same version. Finding them by name means a manifest added for
+// another tool is kept in step without changing this script.
+/** @type {{ path: string, name: string, text: string }[]} */
+let manifests;
 try {
-  manifestText = readFileSync(manifestPath, "utf8");
+  manifests = readdirSync(plugin)
+    .filter((entry) => /^\.[a-z]+-plugin$/.test(entry))
+    .sort()
+    .map((entry) => ({ name: `${entry}/plugin.json`, path: join(plugin, entry, "plugin.json") }))
+    .filter(({ path }) => existsSync(path))
+    .map((manifest) => ({ ...manifest, text: readFileSync(manifest.path, "utf8") }));
 } catch (error) {
   fail(error.message);
 }
+if (manifests.length === 0) fail(`${plugin} has no .<tool>-plugin/plugin.json manifest.`);
 const pluginSkills = join(plugin, "skills");
 
 if (check) {
-  const problems = skillDifferences(sourceSkills, pluginSkills);
-  const pluginVersion = JSON.parse(manifestText).version;
-  if (pluginVersion !== version) {
-    problems.unshift(`plugin.json version is ${pluginVersion}, not ${version}`);
-  }
+  const problems = [
+    ...manifests
+      .map(({ name, text }) => ({ name, manifestVersion: JSON.parse(text).version }))
+      .filter(({ manifestVersion }) => manifestVersion !== version)
+      .map(({ name, manifestVersion }) => `${name} version is ${manifestVersion}, not ${version}`),
+    ...skillDifferences(sourceSkills, pluginSkills),
+  ];
   if (problems.length > 0) {
     console.error(`The plugin doesn't match Argent ${version}:`);
     for (const line of problems) console.error(`  ${line}`);
@@ -150,20 +162,24 @@ if (check) {
 }
 
 // Only the value of the top-level "version" key is replaced, so the rest of
-// plugin.json keeps its formatting. Top-level keys are the ones indented by
-// exactly two spaces.
+// each manifest keeps its formatting. Top-level keys are the ones indented by
+// exactly two spaces. Every manifest is checked before anything is written.
 const versionLine = /^( {2}"version":\s*")[^"]*(")/m;
-const updatedManifest = manifestText.replace(versionLine, `$1${version}$2`);
-if (JSON.parse(updatedManifest).version !== version) {
-  fail(`Can't find a top-level "version" key to set in ${manifestPath}.`);
-}
+const updated = manifests.map(({ path, name, text }) => {
+  const updatedText = text.replace(versionLine, `$1${version}$2`);
+  if (JSON.parse(updatedText).version !== version) {
+    fail(`Can't find a top-level "version" key to set in ${name}.`);
+  }
+  return { path, text: updatedText };
+});
 
 rmSync(pluginSkills, { recursive: true, force: true });
 cpSync(sourceSkills, pluginSkills, {
   recursive: true,
   filter: (path) => !OS_JUNK.has(basename(path)),
 });
-writeFileSync(manifestPath, updatedManifest);
+for (const { path, text } of updated) writeFileSync(path, text);
 console.log(
-  `Copied ${listFiles(pluginSkills).length} skill files from Argent ${version} and set the plugin version.`
+  `Copied ${listFiles(pluginSkills).length} skill files from Argent ${version} and set the version in ` +
+    `${manifests.map(({ name }) => name).join(", ")}.`
 );

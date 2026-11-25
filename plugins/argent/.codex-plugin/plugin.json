@@ -1,0 +1,42 @@
+{
+  "name": "argent",
+  "version": "0.34.0",
+  "description": "Control, debug and profile iOS simulators, Android emulators, TVs, Mac and Electron apps from Codex",
+  "author": {
+    "name": "Software Mansion",
+    "url": "https://swmansion.com"
+  },
+  "homepage": "https://argent.swmansion.com",
+  "repository": "https://github.com/software-mansion/argent-plugins",
+  "license": "Apache-2.0",
+  "keywords": [
+    "ios",
+    "android",
+    "simulator",
+    "emulator",
+    "react-native",
+    "mobile",
+    "testing",
+    "profiling"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "hooks": "./hooks/codex.json",
+  "interface": {
+    "displayName": "Argent",
+    "shortDescription": "Control simulators and devices",
+    "longDescription": "Argent gives Codex direct control of iOS simulators, Android emulators and devices, TVs (Apple TV, Android TV, Fire TV), Electron/Chromium apps and native Mac apps. Codex can tap, swipe and type, record and replay e2e tests, diff screenshots against a baseline, read logs and network traffic, and profile with Hermes, React DevTools, Xcode Instruments and Perfetto. The plugin starts the argent command, so install Argent first with npm install -g @swmansion/argent.",
+    "developerName": "Software Mansion",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://argent.swmansion.com",
+    "privacyPolicyURL": "https://github.com/software-mansion/argent/blob/main/Telemetry.md",
+    "defaultPrompt": [
+      "What can Argent do?",
+      "Run my React Native app on an iOS simulator and take a screenshot.",
+      "Profile my app and find what makes it slow."
+    ],
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png"
+  }
+}

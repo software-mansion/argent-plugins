@@ -1,8 +1,8 @@
 /**
- * Pins the plugin's SessionStart hook (plugins/argent/hooks): that hooks.json still starts
- * check-argent.mjs, and that the script stays silent when `argent` is on PATH and
- * tells Claude how to install it when it isn't. The script is run for real
- * against a PATH this test controls.
+ * Pins the plugin's SessionStart hook (plugins/argent/hooks): that hooks.json (Claude
+ * Code) and codex.json (Codex) still start check-argent.mjs, and that the script
+ * stays silent when `argent` is on PATH and tells the agent how to install it when
+ * it isn't. The script is run for real against a PATH this test controls.
  *
  * Run: node --test test/check-argent.test.mjs
  */
@@ -23,13 +23,14 @@ const isWindows = process.platform === "win32";
  * Runs the hook with PATH set to `pathDirs` alone. node itself is spawned by its
  * absolute path, so the PATH under test decides only whether `argent` is found.
  * @param {string[]} pathDirs
+ * @param {string[]} [args] what the hooks file passes after the script
  */
-function runHook(pathDirs) {
+function runHook(pathDirs, args = []) {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => key.toUpperCase() !== "PATH")
   );
   env.PATH = pathDirs.join(isWindows ? ";" : ":");
-  return spawnSync(process.execPath, [HOOK_SCRIPT], { encoding: "utf8", env });
+  return spawnSync(process.execPath, [HOOK_SCRIPT, ...args], { encoding: "utf8", env });
 }
 
 /**
@@ -72,6 +73,22 @@ test("hooks.json starts check-argent.mjs with node on every SessionStart", () =>
   assert.ok(existsSync(HOOK_SCRIPT), `${HOOK_SCRIPT} is missing`);
 });
 
+test("codex.json starts check-argent.mjs for Codex on every SessionStart", () => {
+  const manifest = JSON.parse(
+    readFileSync(join(PLUGIN_ROOT, ".codex-plugin", "plugin.json"), "utf8")
+  );
+  // Pointing Codex at its own file also stops it reading hooks.json, which it would
+  // run without `args`.
+  assert.equal(manifest.hooks, "./hooks/codex.json");
+  const config = JSON.parse(readFileSync(join(PLUGIN_ROOT, "hooks", "codex.json"), "utf8"));
+  const groups = config.hooks.SessionStart;
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].matcher, undefined);
+  assert.deepEqual(groups[0].hooks, [
+    { type: "command", command: 'node "${PLUGIN_ROOT}/hooks/check-argent.mjs" codex' },
+  ]);
+});
+
 test("prints nothing when argent is on PATH", (t) => {
   const bin = tempDir(t);
   writeFakeArgent(bin);
@@ -85,11 +102,23 @@ test("tells Claude to offer the install when argent is missing", (t) => {
   const result = runHook([tempDir(t)]);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stderr, "");
+  assert.match(result.stdout, /The Argent plugin for Claude Code is enabled/);
   assert.match(result.stdout, /the `argent` command is not on PATH/);
   assert.match(result.stdout, /offer to install it with `npm install -g @swmansion\/argent`/);
   assert.match(result.stdout, /Run the install only after they agree\./);
   assert.match(result.stdout, /Reconnect for plugin:argent:argent in \/mcp/);
   assert.ok(result.stdout.includes(`The Node.js on PATH is ${process.version}.`), result.stdout);
+  assert.match(result.stdout, /npm view @swmansion\/argent engines\.node/);
+});
+
+test("names Codex and its restart when Codex runs the hook", (t) => {
+  const result = runHook([tempDir(t)], ["codex"]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /The Argent plugin for Codex is enabled/);
+  assert.match(result.stdout, /MCP server \(argent\) could not start/);
+  assert.match(result.stdout, /the user has to restart Codex before Argent's tools appear/);
+  assert.match(result.stdout, /Don't suggest `argent init` for Codex/);
+  assert.doesNotMatch(result.stdout, /Claude|\/mcp/);
 });
 
 test("an empty PATH counts as argent missing", () => {

@@ -15,24 +15,25 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT = fileURLToPath(new URL("../scripts/sync-skills.mjs", import.meta.url));
-const REAL_MANIFEST = fileURLToPath(
-  new URL("../plugins/argent/.claude-plugin/plugin.json", import.meta.url)
-);
+const REAL_PLUGIN = fileURLToPath(new URL("../plugins/argent/", import.meta.url));
 
-// Formatted like the real plugin.json, so a test can tell a rewrite of the
+// The manifest of each tool the plugin supports. The sync sets the version in all of them.
+const MANIFESTS = [".claude-plugin/plugin.json", ".codex-plugin/plugin.json"];
+
+// Formatted like the real manifests, so a test can tell a rewrite of the
 // version value from a rewrite of the whole file.
 const manifest = (/** @type {string} */ version) => `{
   "name": "argent",
   "version": "${version}",
-  "mcpServers": {
-    "argent": {
-      "type": "stdio",
-      "command": "argent",
-      "args": ["mcp"]
-    }
+  "interface": {
+    "displayName": "Argent",
+    "version": "a nested key the sync leaves alone"
   }
 }
 `;
+
+/** @param {string} version */
+const manifests = (version) => Object.fromEntries(MANIFESTS.map((m) => [m, manifest(version)]));
 
 const RELEASE_SKILLS = {
   "argent-a/SKILL.md": "---\ndescription: a\n---\nA, as released\n",
@@ -85,15 +86,24 @@ function argentCheckout(t, version, skills) {
 }
 
 /**
- * A plugin folder at `version`.
+ * A plugin folder at `version`, with a manifest for each tool.
  * @param {import("node:test").TestContext} t
  * @param {string} version
  * @param {Record<string, string>} skills
  */
 function pluginFolder(t, version, skills) {
   const root = tempDir(t);
-  writeFiles(root, { ".claude-plugin/plugin.json": manifest(version), ...under("skills", skills) });
+  writeFiles(root, { ...manifests(version), ...under("skills", skills) });
   return root;
+}
+
+/**
+ * Asserts that every manifest in `plugin` is `manifest(version)`.
+ * @param {string} plugin
+ * @param {string} version
+ */
+function assertManifestsAt(plugin, version) {
+  for (const path of MANIFESTS) assert.equal(read(plugin, path), manifest(version), path);
 }
 
 /**
@@ -130,21 +140,50 @@ test("copies the release's skills, drops the ones it no longer has, and sets the
     assert.equal(read(plugin, `skills/${path}`), content);
   }
   assert.ok(!existsSync(join(plugin, "skills", "argent-retired")));
-  assert.equal(read(plugin, ".claude-plugin/plugin.json"), manifest("0.35.0"));
+  assertManifestsAt(plugin, "0.35.0");
 });
 
-test("sets the version in the real plugin.json without touching anything else", (t) => {
+test("sets the version in the real manifests without touching anything else", (t) => {
   const source = argentCheckout(t, "9.9.9", RELEASE_SKILLS);
   const plugin = tempDir(t);
-  const original = readFileSync(REAL_MANIFEST, "utf8");
-  writeFiles(plugin, { ".claude-plugin/plugin.json": original });
+  const originals = Object.fromEntries(
+    MANIFESTS.map((path) => [path, readFileSync(join(REAL_PLUGIN, path), "utf8")])
+  );
+  writeFiles(plugin, originals);
 
   const result = sync(source, plugin, "9.9.9");
 
   assert.equal(result.status, 0, result.stderr);
-  const updated = read(plugin, ".claude-plugin/plugin.json");
-  assert.deepEqual(JSON.parse(updated), { ...JSON.parse(original), version: "9.9.9" });
-  assert.equal(updated.split("\n").length, original.split("\n").length);
+  for (const [path, original] of Object.entries(originals)) {
+    const updated = read(plugin, path);
+    assert.deepEqual(JSON.parse(updated), { ...JSON.parse(original), version: "9.9.9" }, path);
+    assert.equal(updated.split("\n").length, original.split("\n").length, path);
+  }
+});
+
+test("checks every manifest before changing anything", (t) => {
+  const source = argentCheckout(t, "0.35.0", RELEASE_SKILLS);
+  const plugin = pluginFolder(t, "0.34.0", { "argent-a/SKILL.md": "A, older\n" });
+  writeFiles(plugin, { ".codex-plugin/plugin.json": '{\n  "name": "argent"\n}\n' });
+
+  const result = sync(source, plugin, "0.35.0");
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /top-level "version" key to set in \.codex-plugin\/plugin\.json/);
+  assert.equal(read(plugin, ".claude-plugin/plugin.json"), manifest("0.34.0"));
+  assert.equal(read(plugin, "skills/argent-a/SKILL.md"), "A, older\n");
+});
+
+test("refuses a plugin folder without a manifest", (t) => {
+  const source = argentCheckout(t, "0.35.0", RELEASE_SKILLS);
+  const plugin = tempDir(t);
+  writeFiles(plugin, under("skills", { "argent-a/SKILL.md": "A, older\n" }));
+
+  const result = sync(source, plugin, "0.35.0");
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /has no \.<tool>-plugin\/plugin\.json manifest/);
+  assert.equal(read(plugin, "skills/argent-a/SKILL.md"), "A, older\n");
 });
 
 test("leaves files an operating system drops behind out of the copy", (t) => {
@@ -169,7 +208,7 @@ test("refuses a checkout of another release and changes nothing", (t) => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /is at 0\.34\.0, not 0\.35\.0/);
   assert.equal(read(plugin, "skills/argent-a/SKILL.md"), "A, older\n");
-  assert.equal(read(plugin, ".claude-plugin/plugin.json"), manifest("0.34.0"));
+  assertManifestsAt(plugin, "0.34.0");
 });
 
 test("refuses a prerelease", (t) => {
@@ -214,10 +253,23 @@ test("--check lists every difference and changes nothing", (t) => {
   const result = sync(source, plugin, "0.35.0", "--check");
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /plugin\.json version is 0\.34\.0, not 0\.35\.0/);
+  assert.match(result.stderr, /\.claude-plugin\/plugin\.json version is 0\.34\.0, not 0\.35\.0/);
+  assert.match(result.stderr, /\.codex-plugin\/plugin\.json version is 0\.34\.0, not 0\.35\.0/);
   assert.match(result.stderr, /changed: skills\/argent-a\/SKILL\.md/);
   assert.match(result.stderr, /missing: skills\/argent-b\/references\/notes\.md/);
   assert.match(result.stderr, /extra: skills\/argent-c\/SKILL\.md/);
   assert.equal(read(plugin, "skills/argent-a/SKILL.md"), "A, edited here\n");
-  assert.equal(read(plugin, ".claude-plugin/plugin.json"), manifest("0.34.0"));
+  assertManifestsAt(plugin, "0.34.0");
+});
+
+test("--check reports a manifest left at another version", (t) => {
+  const source = argentCheckout(t, "0.35.0", RELEASE_SKILLS);
+  const plugin = pluginFolder(t, "0.35.0", RELEASE_SKILLS);
+  writeFiles(plugin, { ".codex-plugin/plugin.json": manifest("0.34.0") });
+
+  const result = sync(source, plugin, "0.35.0", "--check");
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /\.codex-plugin\/plugin\.json version is 0\.34\.0, not 0\.35\.0/);
+  assert.doesNotMatch(result.stderr, /\.claude-plugin\/plugin\.json version/);
 });

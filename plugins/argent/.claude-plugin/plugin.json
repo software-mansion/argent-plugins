@@ -10,6 +10,7 @@
   "homepage": "https://argent.swmansion.com",
   "repository": "https://github.com/software-mansion/argent-plugins",
   "license": "Apache-2.0",
+  "icon": "./assets/icon.png",
   "keywords": [
     "ios",
     "android",
@@ -19,12 +20,5 @@
     "mobile",
     "testing",
     "profiling"
-  ],
-  "mcpServers": {
-    "argent": {
-      "type": "stdio",
-      "command": "argent",
-      "args": ["mcp"]
-    }
-  }
+  ]
 }
