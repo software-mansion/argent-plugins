@@ -1,0 +1,88 @@
+name: Sync with Argent
+run-name: Sync with Argent ${{ inputs.version }}
+
+# Releases the plugin for a stable Argent release: copies packages/skills/skills
+# from tag v<version> of the argent repository, sets the plugin's version, runs
+# the checks and pushes to main. Anthropic's plugin directory follows main, so
+# that push is the release.
+#
+# The argent repository starts this run for every stable release once npm has
+# it, from its sync-claude-plugin.yml, and waits for the result. Run it by hand
+# to retry, or to re-sync or roll back to a given release. Syncing the version
+# the plugin already has changes nothing.
+#
+# A push made with GITHUB_TOKEN starts no workflows, so ci.yml doesn't run on
+# the sync commit. The same checks run here before the push instead.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Stable Argent version to sync."
+        required: true
+        type: string
+
+concurrency:
+  group: sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+
+    steps:
+      # Before anything uses the version as a git ref or in a commit message.
+      - name: Check the version
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$VERSION' is not a stable X.Y.Z version"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check out Argent v${{ inputs.version }}
+        uses: actions/checkout@v7
+        with:
+          repository: software-mansion/argent
+          ref: v${{ inputs.version }}
+          path: .argent
+          sparse-checkout: packages/skills
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Copy the skills and set the version
+        run: node scripts/sync-skills.mjs --source .argent --version "$VERSION"
+
+      - name: Run tests
+        run: npm test
+
+      # Pinned for the same reason as in ci.yml; keep the two in step.
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code@2.1.326
+
+      - name: Validate
+        run: npm run validate
+
+      - name: Push
+        run: |
+          if [ -z "$(git status --porcelain -- plugin)" ]; then
+            echo "The plugin already matches Argent $VERSION."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898499+github-actions[bot]@users.noreply.github.com"
+          git add plugin
+          git commit -m "chore: sync with Argent v$VERSION"
+          git push

@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+# Supersede a PR's in-flight run rather than let it hold a runner for a verdict
+# nobody wants. A push to main keeps its run: that is the commit's only record.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # The hook finds commands differently on Windows: PATHEXT, no execute bit.
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Run tests
+        run: npm test
+
+  validate:
+    name: Validate plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      # Pinned so a new Claude Code release can't change the verdict on an
+      # unchanged plugin. Bump it to pick up new directory checks.
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code@2.1.326
+
+      # `--profile directory` fails on what Anthropic's plugin directory refuses,
+      # and `--strict` on its warnings too. The second command checks the
+      # marketplace file.
+      - name: Validate
+        run: npm run validate
+
+  skills:
+    name: Skills match the Argent release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Read the plugin version
+        id: plugin
+        run: echo "version=$(jq -r .version plugin/.claude-plugin/plugin.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out Argent v${{ steps.plugin.outputs.version }}
+        uses: actions/checkout@v7
+        with:
+          repository: software-mansion/argent
+          ref: v${{ steps.plugin.outputs.version }}
+          path: .argent
+          sparse-checkout: packages/skills
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Compare
+        env:
+          VERSION: ${{ steps.plugin.outputs.version }}
+        run: node scripts/sync-skills.mjs --source .argent --version "$VERSION" --check

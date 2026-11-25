@@ -1,0 +1,14 @@
+{
+  "name": "swmansion",
+  "description": "Claude Code plugins from Software Mansion",
+  "owner": {
+    "name": "Software Mansion",
+    "url": "https://swmansion.com"
+  },
+  "plugins": [
+    {
+      "name": "argent",
+      "source": "./plugin"
+    }
+  ]
+}

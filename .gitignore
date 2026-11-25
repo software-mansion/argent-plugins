@@ -1,0 +1,4 @@
+# The argent checkout that CI and the sync workflow make.
+.argent/
+node_modules/
+.DS_Store

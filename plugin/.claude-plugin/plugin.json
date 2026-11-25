@@ -1,0 +1,30 @@
+{
+  "name": "argent",
+  "displayName": "Argent",
+  "version": "0.34.0",
+  "description": "Control, debug and profile iOS simulators, Android emulators, TVs, Mac and Electron apps from Claude Code",
+  "author": {
+    "name": "Software Mansion",
+    "url": "https://swmansion.com"
+  },
+  "homepage": "https://argent.swmansion.com",
+  "repository": "https://github.com/software-mansion/argent-plugins",
+  "license": "Apache-2.0",
+  "keywords": [
+    "ios",
+    "android",
+    "simulator",
+    "emulator",
+    "react-native",
+    "mobile",
+    "testing",
+    "profiling"
+  ],
+  "mcpServers": {
+    "argent": {
+      "type": "stdio",
+      "command": "argent",
+      "args": ["mcp"]
+    }
+  }
+}
