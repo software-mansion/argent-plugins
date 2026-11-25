@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "test": "node --test \"test/*.test.mjs\"",
-    "validate": "claude plugin validate plugin --strict --profile directory && claude plugin validate . --strict",
+    "validate": "claude plugin validate plugins/argent --strict --profile directory && claude plugin validate . --strict",
     "sync": "node scripts/sync-skills.mjs"
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Pins the plugin's SessionStart hook (plugin/hooks): that hooks.json still starts
+ * Pins the plugin's SessionStart hook (plugins/argent/hooks): that hooks.json still starts
  * check-argent.mjs, and that the script stays silent when `argent` is on PATH and
  * tells Claude how to install it when it isn't. The script is run for real
  * against a PATH this test controls.
@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const PLUGIN_ROOT = fileURLToPath(new URL("../plugin/", import.meta.url));
+const PLUGIN_ROOT = fileURLToPath(new URL("../plugins/argent/", import.meta.url));
 const HOOK_SCRIPT = join(PLUGIN_ROOT, "hooks", "check-argent.mjs");
 const isWindows = process.platform === "win32";
 

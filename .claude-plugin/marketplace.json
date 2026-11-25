@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "argent",
-      "source": "./plugin"
+      "source": "./plugins/argent"
     }
   ]
 }

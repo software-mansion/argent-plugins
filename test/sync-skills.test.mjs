@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT = fileURLToPath(new URL("../scripts/sync-skills.mjs", import.meta.url));
 const REAL_MANIFEST = fileURLToPath(
-  new URL("../plugin/.claude-plugin/plugin.json", import.meta.url)
+  new URL("../plugins/argent/.claude-plugin/plugin.json", import.meta.url)
 );
 
 // Formatted like the real plugin.json, so a test can tell a rewrite of the

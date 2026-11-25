@@ -71,7 +71,7 @@ jobs:
 
       - name: Read the plugin version
         id: plugin
-        run: echo "version=$(jq -r .version plugin/.claude-plugin/plugin.json)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(jq -r .version plugins/argent/.claude-plugin/plugin.json)" >> "$GITHUB_OUTPUT"
 
       - name: Check out Argent v${{ steps.plugin.outputs.version }}
         uses: actions/checkout@v7

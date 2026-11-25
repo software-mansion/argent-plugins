@@ -1,2 +1,2 @@
 # A byte-for-byte copy of the skills in an Argent release. CI fails if it changes.
-plugin/skills/
+plugins/argent/skills/

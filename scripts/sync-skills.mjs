@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Makes the plugin match one Argent release: replaces plugin/skills with the
+// Makes the plugin match one Argent release: replaces plugins/argent/skills with the
 // skills from a checkout of the argent repository at tag v<version>, and sets
 // the plugin's version to <version>. The sync workflow runs it for each new
 // stable release.
@@ -10,7 +10,7 @@
 //
 //   node scripts/sync-skills.mjs --source <argent checkout> --version <X.Y.Z> [--check]
 //
-// --plugin <dir> points it at a plugin folder other than plugin/; the tests use it.
+// --plugin <dir> points it at a plugin folder other than plugins/argent/; the tests use it.
 
 import { cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
@@ -87,7 +87,10 @@ try {
     options: {
       source: { type: "string" },
       version: { type: "string" },
-      plugin: { type: "string", default: fileURLToPath(new URL("../plugin", import.meta.url)) },
+      plugin: {
+        type: "string",
+        default: fileURLToPath(new URL("../plugins/argent", import.meta.url)),
+      },
       check: { type: "boolean", default: false },
     },
   }));

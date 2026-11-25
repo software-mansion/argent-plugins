@@ -77,12 +77,12 @@ jobs:
 
       - name: Push
         run: |
-          if [ -z "$(git status --porcelain -- plugin)" ]; then
+          if [ -z "$(git status --porcelain -- plugins/argent)" ]; then
             echo "The plugin already matches Argent $VERSION."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898499+github-actions[bot]@users.noreply.github.com"
-          git add plugin
+          git add plugins/argent
           git commit -m "chore: sync with Argent v$VERSION"
           git push
