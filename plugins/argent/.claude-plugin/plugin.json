@@ -1,7 +1,7 @@
 {
   "name": "argent",
   "displayName": "Argent",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "description": "Control, debug and profile iOS simulators, Android emulators, TVs, Mac and Electron apps from Claude Code",
   "author": {
     "name": "Software Mansion",
