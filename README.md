@@ -40,7 +40,7 @@ The plugin isn't in OpenAI's plugin directory: it doesn't accept plugins with ho
 | `plugins/argent/.codex-plugin/plugin.json`  | The Codex manifest, including its listing details under `interface`                                                     |
 | `plugins/argent/.mcp.json`                  | Argent's MCP server, `argent mcp`, for both tools                                                                       |
 | `plugins/argent/skills/`                    | Argent's skills, copied from the argent repository by the sync workflow. Don't edit here                                |
-| `plugins/argent/hooks/`                     | The check at session start for a missing `argent` command: `hooks.json` starts it in Claude Code, `codex.json` in Codex |
+| `plugins/argent/hooks/`                     | The check at session start of `argent` and of its version: `hooks.json` starts it in Claude Code, `codex.json` in Codex |
 | `plugins/argent/assets/icon.png`            | The plugin's icon, for both tools                                                                                       |
 | `.claude-plugin/marketplace.json`           | Makes this repository a Claude Code marketplace named `swmansion`, listing the plugin                                   |
 | `.agents/plugins/marketplace.json`          | Makes this repository a Codex marketplace named `swmansion`, listing the plugin                                         |

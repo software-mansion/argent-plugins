@@ -42,7 +42,7 @@ Claude Code asks before each Argent tool runs. To let them run without asking, a
 ## What the plugin runs
 
 - **Argent's MCP server**, by starting the `argent mcp` command you installed.
-- **A check at the start of each session** (`hooks/check-argent.mjs`, run with Node.js). It looks for `argent` on your PATH and, if it's missing, tells the agent so that it can offer to install it when you ask for something that needs Argent. It only checks your PATH and sends nothing anywhere. Codex runs it only after you trust it in `/hooks`.
+- **A check at the start of each session** (`hooks/check-argent.mjs`, run with Node.js). It looks for `argent` on your PATH and runs `argent --version`. If Argent is missing, it tells the agent, so that it can offer to install it when you ask for something that needs Argent. If Argent's version differs from the plugin's, the agent offers to update Argent or the plugin the first time it uses Argent in the session. The check sends nothing anywhere. Codex runs it only after you trust it in `/hooks`.
 
 ## Privacy
 
